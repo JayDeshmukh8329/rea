@@ -1,0 +1,67 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Phase 3: Primitive Definition
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+    
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Phase 4: Validations
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['uid', 'name', 'preferences', 'createdAt', 'updatedAt']) 
+        && data.keys().size() == 5
+        && data.uid == request.auth.uid
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 100
+        && data.preferences is map
+        && data.preferences.keys().hasAll(['roastLevel', 'favoriteTopics'])
+        && data.preferences.keys().size() == 2
+        && data.preferences.roastLevel in ['low', 'medium', 'high']
+        && data.preferences.favoriteTopics is list
+        && data.preferences.favoriteTopics.size() <= 20
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    match /userProfiles/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if isSignedIn() && resource.data.uid == request.auth.uid;
+      
+      allow create: if isOwner(userId) 
+        && isValidUserProfile(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+        
+      allow update: if isOwner(userId)
+        && isValidUserProfile(incoming())
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          // Action: Profile Update
+          incoming().diff(existing()).affectedKeys().hasOnly(['name', 'preferences', 'updatedAt'])
+        );
+        
+      allow delete: if false; // Profiles are permanent for now
+    }
+  }
+}

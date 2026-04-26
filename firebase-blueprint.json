@@ -1,0 +1,29 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Stores user preferences and information for Era's personalization.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Unique identifier for the user." },
+        "name": { "type": "string", "description": "The name Era should call the user." },
+        "preferences": {
+          "type": "object",
+          "properties": {
+            "roastLevel": { "type": "string", "enum": ["low", "medium", "high"], "description": "How sassy Era should be." },
+            "favoriteTopics": { "type": "array", "items": { "type": "string" }, "description": "Topics the user is interested in." }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "name"]
+    }
+  },
+  "firestore": {
+    "userProfiles/{userId}": {
+      "schema": "UserProfile",
+      "description": "Collection of user profiles."
+    }
+  }
+}
